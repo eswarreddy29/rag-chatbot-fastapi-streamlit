@@ -1,0 +1,20 @@
+# Local Vector Database (Crucial to ignore)
+backend/chroma_db/
+backend/documents/*
+!backend/documents/.gitkeep
+
+# Environment variables & API secrets
+.env
+.env.txt
+
+# Python virtual environments & caching
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Operating system files
+.DS_Store
+Thumbs.db
