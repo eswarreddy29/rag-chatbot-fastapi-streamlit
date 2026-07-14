@@ -1,0 +1,27 @@
+# Web Framework & API Server
+fastapi>=0.110.0
+uvicorn>=0.28.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.1
+pydantic>=2.6.0
+
+# LangChain Core & Specialized Integrations
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+langchain-classic>=0.1.0
+langchain-huggingface>=0.1.0
+langchain-chroma>=0.1.0
+langchain-groq>=0.1.0
+
+# Frontend User Interface
+streamlit>=1.32.0
+requests>=2.31.0
+
+# Document Parsing & Storage Engines
+pypdf>=4.1.0
+chromadb>=0.5.0
+
+# Machine Learning & Embedding Drivers (CPU Optimized)
+sentence-transformers>=3.0.0
+torch>=2.2.1 --index-url https://download.pytorch.org/whl/cpu
