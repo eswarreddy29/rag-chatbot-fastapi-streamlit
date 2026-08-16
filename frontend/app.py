@@ -11,6 +11,18 @@ st.set_page_config(
     layout="wide"
 )
 
+# Hide top header, toolbar, GitHub icon, and footer
+hide_streamlit_elements = """
+    <style>
+    header {visibility: hidden;}
+    [data-testid="stHeader"] {display: none;}
+    [data-testid="stToolbar"] {display: none;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_streamlit_elements, unsafe_allow_html=True)
+
 # Sidebar UI for File Uploading & Controls
 with st.sidebar:
     st.title("📁 Document Control Center")
