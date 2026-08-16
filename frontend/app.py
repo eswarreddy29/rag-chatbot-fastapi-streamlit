@@ -5,23 +5,19 @@ import streamlit as st
 # Dynamically pull backend host URL (Set BACKEND_URL in Render Environment settings)
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
+import streamlit as st
+
+import streamlit as st
+
+import streamlit as st
+
 st.set_page_config(
-    page_title="Enterprise Document RAG",
+    page_title="Intelligent Document Chatbot",
     page_icon="🤖",
     layout="wide"
 )
 
-# Hide top header, toolbar, GitHub icon, and footer
-hide_streamlit_elements = """
-    <style>
-    header {visibility: hidden;}
-    [data-testid="stHeader"] {display: none;}
-    [data-testid="stToolbar"] {display: none;}
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    </style>
-"""
-st.markdown(hide_streamlit_elements, unsafe_allow_html=True)
+
 
 # Sidebar UI for File Uploading & Controls
 with st.sidebar:
