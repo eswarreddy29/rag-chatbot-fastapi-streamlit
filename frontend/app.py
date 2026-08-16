@@ -5,11 +5,6 @@ import streamlit as st
 # Dynamically pull backend host URL (Set BACKEND_URL in Render Environment settings)
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
-import streamlit as st
-
-import streamlit as st
-
-import streamlit as st
 
 st.set_page_config(
     page_title="Intelligent Document Chatbot",
