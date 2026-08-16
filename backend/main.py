@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient, models
 from langchain_groq import ChatGroq
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
@@ -26,17 +27,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "backend/documents"
-DB_DIR = "backend/chroma_db"
+# Use ephemeral temp folder for Render file storage
+UPLOAD_DIR = os.getenv("TEMP_DOCS_DIR", "/tmp/documents")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Initialize local embeddings (Zero Budget - Runs free on CPU)
+# Qdrant Cloud Configurations
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+COLLECTION_NAME = "enterprise_docs"
+
+# 1. Initialize local embeddings (BAAI/bge-small-en-v1.5 has 384 dimensions)
 embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
-# Initialize Vector Store
-vector_store = Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
+# 2. Initialize Qdrant Client
+qdrant_client = QdrantClient(
+    url=QDRANT_URL,
+    api_key=QDRANT_API_KEY,
+)
 
-# Initialize Open-Source LLM via Groq Free Tier
+def ensure_qdrant_collection():
+    """Ensure collection exists in Qdrant Cloud with correct vector dimensions."""
+    collections = [col.name for col in qdrant_client.get_collections().collections]
+    if COLLECTION_NAME not in collections:
+        qdrant_client.create_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
+        )
+
+# Initialize Collection on Startup
+ensure_qdrant_collection()
+
+# 3. Initialize Qdrant Vector Store
+vector_store = QdrantVectorStore(
+    client=qdrant_client,
+    collection_name=COLLECTION_NAME,
+    embedding=embeddings,
+)
+
+# 4. Initialize Open-Source LLM via Groq API
 llm = ChatGroq(
     temperature=0.4, 
     model_name="llama-3.1-8b-instant", 
@@ -64,7 +92,7 @@ async def upload_file(file: UploadFile = File(...)):
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         final_documents = text_splitter.split_documents(docs)
         
-        # 3. Embed and store chunks into ChromaDB
+        # 3. Embed and store chunks into Qdrant Cloud
         vector_store.add_documents(final_documents)
         
         return {"message": f"Successfully processed and indexed {file.filename}"}
@@ -108,13 +136,13 @@ async def query_rag(request: QueryRequest):
 @app.post("/clear")
 async def clear_database():
     try:
-        global vector_store
-        # Delete the existing collection data from ChromaDB
-        vector_store.delete_collection()
-        # Re-initialize a clean, empty vector store
-        vector_store = Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
+        # 1. Re-create collection in Qdrant Cloud to purge all vectors
+        qdrant_client.recreate_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
+        )
         
-        # Clear out physical files in the upload directory
+        # 2. Clear out physical temp files in local upload directory
         for filename in os.listdir(UPLOAD_DIR):
             file_path = os.path.join(UPLOAD_DIR, filename)
             if os.path.isfile(file_path):

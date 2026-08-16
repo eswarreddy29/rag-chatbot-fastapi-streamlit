@@ -1,7 +1,9 @@
-import streamlit as st
+import os
 import requests
+import streamlit as st
 
-BACKEND_URL = "http://localhost:8000"
+# Dynamically pull backend host URL (Set BACKEND_URL in Render Environment settings)
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 st.set_page_config(
     page_title="Enterprise Document RAG",
@@ -16,7 +18,7 @@ with st.sidebar:
     # Updated Clear Chat Button to wipe the backend database too
     if st.button("🗑️ Clear Chat & Knowledge Base", use_container_width=True):
         try:
-            # Tell the backend to wipe ChromaDB and the documents folder
+            # Tell the backend to wipe Qdrant Cloud collection and temporary local documents
             response = requests.post(f"{BACKEND_URL}/clear")
             if response.status_code == 200:
                 st.session_state.messages = []
@@ -27,7 +29,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Connection error: {e}")
         
-    # Kept: Clear Chat Button
+    # Clear Chat Button
     if st.button("🗑️ Clear Chat History", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -36,8 +38,6 @@ with st.sidebar:
     
     st.subheader("Upload context files")
 
-    
-    # Reverted back to strictly PDF processing
     uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
     
     if uploaded_file is not None:
@@ -54,7 +54,7 @@ with st.sidebar:
                     st.error(f"Could not connect to backend: {e}")
                     
     st.markdown("---")
-    st.caption("Powered by FastAPI, ChromaDB & LangChain")
+    st.caption("Powered by FastAPI, Qdrant Cloud & LangChain")
 
 # Main Interface Header
 st.title("🤖 Intelligent Document Chatbot")
