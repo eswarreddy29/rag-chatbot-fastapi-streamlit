@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings  # <-- Replaced HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 from langchain_groq import ChatGroq
@@ -18,7 +18,6 @@ load_dotenv()
 
 app = FastAPI(title="LLM RAG Engine Backend")
 
-# Enable CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,17 +26,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Use ephemeral temp folder for Render file storage
 UPLOAD_DIR = os.getenv("TEMP_DOCS_DIR", "/tmp/documents")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Qdrant Cloud Configurations
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = "enterprise_docs"
 
-# 1. Initialize local embeddings (BAAI/bge-small-en-v1.5 has 384 dimensions)
-embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
+# 1. Initialize Lightweight FastEmbed (ONNX Runtime - <100MB RAM)
+embeddings = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 # 2. Initialize Qdrant Client
 qdrant_client = QdrantClient(
@@ -46,7 +43,6 @@ qdrant_client = QdrantClient(
 )
 
 def ensure_qdrant_collection():
-    """Ensure collection exists in Qdrant Cloud with correct vector dimensions."""
     collections = [col.name for col in qdrant_client.get_collections().collections]
     if COLLECTION_NAME not in collections:
         qdrant_client.create_collection(
@@ -54,17 +50,14 @@ def ensure_qdrant_collection():
             vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
         )
 
-# Initialize Collection on Startup
 ensure_qdrant_collection()
 
-# 3. Initialize Qdrant Vector Store
 vector_store = QdrantVectorStore(
     client=qdrant_client,
     collection_name=COLLECTION_NAME,
     embedding=embeddings,
 )
 
-# 4. Initialize Open-Source LLM via Groq API
 llm = ChatGroq(
     temperature=0.4, 
     model_name="llama-3.1-8b-instant", 
@@ -84,15 +77,12 @@ async def upload_file(file: UploadFile = File(...)):
         f.write(await file.read())
         
     try:
-        # 1. Load document
         loader = PyPDFLoader(file_path)
         docs = loader.load()
         
-        # 2. Split document into chunks
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         final_documents = text_splitter.split_documents(docs)
         
-        # 3. Embed and store chunks into Qdrant Cloud
         vector_store.add_documents(final_documents)
         
         return {"message": f"Successfully processed and indexed {file.filename}"}
@@ -102,10 +92,8 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/query")
 async def query_rag(request: QueryRequest):
     try:
-        # Configure retriever to fetch top 3 matching contexts
         retriever = vector_store.as_retriever(search_kwargs={"k": 3})
         
-        # Define strict contextual system prompt
         system_prompt = (
             "You are a highly engaging, brilliant AI assistant helping a user with their documents.\n"
             "Below is information extracted from their uploaded files.\n\n"
@@ -123,7 +111,6 @@ async def query_rag(request: QueryRequest):
             ("human", "{input}"),
         ])
         
-        # Create RAG Chain
         question_answer_chain = create_stuff_documents_chain(llm, prompt)
         rag_chain = create_retrieval_chain(retriever, question_answer_chain)
         
@@ -136,13 +123,11 @@ async def query_rag(request: QueryRequest):
 @app.post("/clear")
 async def clear_database():
     try:
-        # 1. Re-create collection in Qdrant Cloud to purge all vectors
         qdrant_client.recreate_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
         )
         
-        # 2. Clear out physical temp files in local upload directory
         for filename in os.listdir(UPLOAD_DIR):
             file_path = os.path.join(UPLOAD_DIR, filename)
             if os.path.isfile(file_path):
@@ -151,7 +136,6 @@ async def clear_database():
         return {"message": "Knowledge base and chat history cleared successfully!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 if __name__ == "__main__":
     import uvicorn
