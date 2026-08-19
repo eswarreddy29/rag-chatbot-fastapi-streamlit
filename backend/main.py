@@ -60,7 +60,7 @@ vector_store = QdrantVectorStore(
 
 llm = ChatGroq(
     temperature=0.4, 
-    model_name="llama-3.1-8b-instant", 
+    model_name="openai/gpt-oss-120b", 
     groq_api_key=os.getenv("GROQ_API_KEY")
 )
 
